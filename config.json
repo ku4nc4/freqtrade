@@ -1,7 +1,7 @@
 {
   "max_open_trades": 100,
   "stake_currency": "USDT",
-  "stake_amount": 15,
+  "stake_amount": "unlimited",
   "tradable_balance_ratio": 0.99,
   "fiat_display_currency": "IDR",
   "timeframe": "5m",
@@ -43,7 +43,7 @@
     ],
     "pair_blacklist": ["BNB/*"]
   },
-  "pairlists": [{ "method": "StaticPairList"},{"method":"AgeFilter", "min_days_listed" : 100}],
+  "pairlists": [{ "method": "StaticPairList"},{"method":"AgeFilter", "min_days_listed" : 30}],
   "edge": {
     "enabled": false,
     "process_throttle_secs": 3600,
