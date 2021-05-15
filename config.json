@@ -39,7 +39,7 @@
     },
     "pair_whitelist": [
         "ETH/USDT","BTC/USDT","DOGE/USDT","BUSD/USDT","BNB/USDT","ADA/USDT","XRP/USDT","EOS/USDT","DOT/USDT","LTC/USDT","ETC/USDT","BCH/USDT","MATIC/USDT"
-        ,"SHIB/USDT","PERP/USDT","SUSHIUP/USDT","ATM/USDT","OM/USDT","ETC/USDT","TRX/USDT","LINK/USDT"
+        ,"SHIB/USDT","PERP/USDT","SUSHIUP/USDT","ATM/USDT","OM/USDT","TRX/USDT","LINK/USDT"
     ],
     "pair_blacklist": ["BNB/*"]
   },
