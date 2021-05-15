@@ -59,9 +59,9 @@
     "remove_pumps": false
   },
   "telegram": {
-    "enabled": false,
-    "token": "your_telegram_token",
-    "chat_id": "your_telegram_chat_id"
+    "enabled": true,
+    "token": "1832804305:AAFQxLDagBIb6si50AqcKyj6Xpb7kfxmxBg",
+    "chat_id": "760922649"
   },
   "api_server": {
     "enabled": false,
