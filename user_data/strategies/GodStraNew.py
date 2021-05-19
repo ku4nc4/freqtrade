@@ -1,9 +1,10 @@
-# GodStra Strategy
+# GodStraNew Strategy
 # Author: @Mablue (Masoud Azizi)
 # github: https://github.com/mablue/
-# freqtrade hyperopt --hyperopt-loss SharpeHyperOptLoss --spaces buy sell --strategy GodStraNew
+# freqtrade hyperopt --hyperopt-loss SharpeHyperOptLoss --spaces buy roi trailing sell --strategy GodStraNew
 # --- Do not remove these libs ---
-from freqtrade.strategy.hyper import CategoricalParameter, RealParameter
+from freqtrade import data
+from freqtrade.strategy.hyper import CategoricalParameter, DecimalParameter
 
 from numpy.lib import math
 from freqtrade.strategy.interface import IStrategy
@@ -14,57 +15,193 @@ from pandas import DataFrame
 # Add your lib to import here
 # TODO: talib is fast but have not more indicators
 import talib.abstract as ta
-# TODO: ta library is not speedy!
-# from ta import add_all_ta_features, add_trend_ta, add_volatility_ta
-import pandas as pd
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from functools import reduce
 import numpy as np
 from random import shuffle
 #  TODO: this gene is removed 'MAVP' cuz or error on periods
-god_genes = [
-    'ACOS', 'AD', 'ADD', 'ADOSC', 'ADX', 'ADXR', 'APO',
-    'AROON-0', 'AROON-1', 'AROONOSC', 'ASIN', 'ATAN', 'ATR', 'AVGPRICE',
-    'BBANDS-0', 'BBANDS-1', 'BBANDS-2', 'BETA',
-    'BOP', 'CCI', 'CDL2CROWS', 'CDL3BLACKCROWS', 'CDL3INSIDE', 'CDL3LINESTRIKE',
-    'CDL3OUTSIDE', 'CDL3STARSINSOUTH', 'CDL3WHITESOLDIERS', 'CDLABANDONEDBABY',
-    'CDLADVANCEBLOCK', 'CDLBELTHOLD', 'CDLBREAKAWAY', 'CDLCLOSINGMARUBOZU',
-    'CDLCONCEALBABYSWALL', 'CDLCOUNTERATTACK', 'CDLDARKCLOUDCOVER', 'CDLDOJI',
-    'CDLDOJISTAR', 'CDLDRAGONFLYDOJI', 'CDLENGULFING', 'CDLEVENINGDOJISTAR',
-    'CDLEVENINGSTAR', 'CDLGAPSIDESIDEWHITE', 'CDLGRAVESTONEDOJI', 'CDLHAMMER',
-    'CDLHANGINGMAN', 'CDLHARAMI', 'CDLHARAMICROSS', 'CDLHIGHWAVE', 'CDLHIKKAKE',
-    'CDLHIKKAKEMOD', 'CDLHOMINGPIGEON', 'CDLIDENTICAL3CROWS', 'CDLINNECK',
-    'CDLINVERTEDHAMMER', 'CDLKICKING', 'CDLKICKINGBYLENGTH', 'CDLLADDERBOTTOM',
-    'CDLLONGLEGGEDDOJI', 'CDLLONGLINE', 'CDLMARUBOZU', 'CDLMATCHINGLOW',
-    'CDLMATHOLD', 'CDLMORNINGDOJISTAR', 'CDLMORNINGSTAR', 'CDLONNECK',
-    'CDLPIERCING', 'CDLRICKSHAWMAN', 'CDLRISEFALL3METHODS', 'CDLSEPARATINGLINES',
-    'CDLSHOOTINGSTAR', 'CDLSHORTLINE', 'CDLSPINNINGTOP', 'CDLSTALLEDPATTERN',
-    'CDLSTICKSANDWICH', 'CDLTAKURI', 'CDLTASUKIGAP', 'CDLTHRUSTING', 'CDLTRISTAR',
-    'CDLUNIQUE3RIVER', 'CDLUPSIDEGAP2CROWS', 'CDLXSIDEGAP3METHODS', 'CEIL', 'CMO',
-    'CORREL', 'COS', 'COSH', 'DEMA', 'DIV', 'DX', 'EMA', 'EXP', 'FLOOR',
-    'HT_DCPERIOD', 'HT_DCPHASE',
-    'HT_PHASOR-0', 'HT_PHASOR-1', 'HT_SINE-0', 'HT_SINE-1', 'HT_TRENDLINE',
-    'HT_TRENDMODE', 'KAMA', 'LINEARREG', 'LINEARREG_ANGLE', 'LINEARREG_INTERCEPT',
-    'LINEARREG_SLOPE', 'LN', 'LOG10', 'MA',
-    'MACD-0', 'MACD-1', 'MACD-2', 'MACDEXT-0', 'MACDEXT-1', 'MACDEXT-2',
-    'MACDFIX-0', 'MACDFIX-1', 'MACDFIX-2',
-    # 'MAVP',
-    'MAMA-0', 'MAMA-1',
-    'MAX', 'MAXINDEX', 'MEDPRICE', 'MFI', 'MIDPOINT', 'MIDPRICE',
-    'MIN', 'MININDEX', 'MINMAX-0', 'MINMAX-1', 'MINMAXINDEX-0', 'MINMAXINDEX-1',
-    'MINUS_DI', 'MINUS_DM', 'MOM',
-    'MULT', 'NATR', 'OBV', 'PLUS_DI', 'PLUS_DM', 'PPO', 'ROC', 'ROCP', 'ROCR',
-    'ROCR100', 'RSI', 'SAR', 'SAREXT', 'SIN', 'SINH', 'SMA', 'SQRT', 'STDDEV',
-    'STOCH-0', 'STOCH-1', 'STOCHF-0', 'STOCHF-1', 'STOCHRSI-0', 'STOCHRSI-1',
-    'SUB', 'SUM', 'T3', 'TAN', 'TANH', 'TEMA',
-    'TRANGE', 'TRIMA', 'TRIX', 'TSF', 'TYPPRICE', 'ULTOSC', 'VAR', 'WCLPRICE',
-    'WILLR', 'WMA'
-]
+all_god_genes = {
+    'Overlap Studies': {
+        'BBANDS-0',             # Bollinger Bands
+        'BBANDS-1',             # Bollinger Bands
+        'BBANDS-2',             # Bollinger Bands
+        'DEMA',                 # Double Exponential Moving Average
+        'EMA',                  # Exponential Moving Average
+        'HT_TRENDLINE',         # Hilbert Transform - Instantaneous Trendline
+        'KAMA',                 # Kaufman Adaptive Moving Average
+        'MA',                   # Moving average
+        'MAMA-0',               # MESA Adaptive Moving Average
+        'MAMA-1',               # MESA Adaptive Moving Average
+        # TODO: Fix this
+        # 'MAVP',               # Moving average with variable period
+        'MIDPOINT',             # MidPoint over period
+        'MIDPRICE',             # Midpoint Price over period
+        'SAR',                  # Parabolic SAR
+        'SAREXT',               # Parabolic SAR - Extended
+        'SMA',                  # Simple Moving Average
+        'T3',                   # Triple Exponential Moving Average (T3)
+        'TEMA',                 # Triple Exponential Moving Average
+        'TRIMA',                # Triangular Moving Average
+        'WMA',                  # Weighted Moving Average
+    },
+    'Momentum Indicators': {
+        'ADX',                  # Average Directional Movement Index
+        'ADXR',                 # Average Directional Movement Index Rating
+        'APO',                  # Absolute Price Oscillator
+        'AROON-0',              # Aroon
+        'AROON-1',              # Aroon
+        'AROONOSC',             # Aroon Oscillator
+        'BOP',                  # Balance Of Power
+        'CCI',                  # Commodity Channel Index
+        'CMO',                  # Chande Momentum Oscillator
+        'DX',                   # Directional Movement Index
+        'MACD-0',               # Moving Average Convergence/Divergence
+        'MACD-1',               # Moving Average Convergence/Divergence
+        'MACD-2',               # Moving Average Convergence/Divergence
+        'MACDEXT-0',            # MACD with controllable MA type
+        'MACDEXT-1',            # MACD with controllable MA type
+        'MACDEXT-2',            # MACD with controllable MA type
+        'MACDFIX-0',            # Moving Average Convergence/Divergence Fix 12/26
+        'MACDFIX-1',            # Moving Average Convergence/Divergence Fix 12/26
+        'MACDFIX-2',            # Moving Average Convergence/Divergence Fix 12/26
+        'MFI',                  # Money Flow Index
+        'MINUS_DI',             # Minus Directional Indicator
+        'MINUS_DM',             # Minus Directional Movement
+        'MOM',                  # Momentum
+        'PLUS_DI',              # Plus Directional Indicator
+        'PLUS_DM',              # Plus Directional Movement
+        'PPO',                  # Percentage Price Oscillator
+        'ROC',                  # Rate of change : ((price/prevPrice)-1)*100
+        'ROCP',                 # Rate of change Percentage: (price-prevPrice)/prevPrice
+        'ROCR',                 # Rate of change ratio: (price/prevPrice)
+        'ROCR100',              # Rate of change ratio 100 scale: (price/prevPrice)*100
+        'RSI',                  # Relative Strength Index
+        'STOCH-0',              # Stochastic
+        'STOCH-1',              # Stochastic
+        'STOCHF-0',             # Stochastic Fast
+        'STOCHF-1',             # Stochastic Fast
+        'STOCHRSI-0',           # Stochastic Relative Strength Index
+        'STOCHRSI-1',           # Stochastic Relative Strength Index
+        'TRIX',                 # 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA
+        'ULTOSC',               # Ultimate Oscillator
+        'WILLR',                # Williams' %R
+    },
+    'Volume Indicators': {
+        'AD',                   # Chaikin A/D Line
+        'ADOSC',                # Chaikin A/D Oscillator
+        'OBV',                  # On Balance Volume
+    },
+    'Volatility Indicators': {
+        'ATR',                  # Average True Range
+        'NATR',                 # Normalized Average True Range
+        'TRANGE',               # True Range
+    },
+    'Price Transform': {
+        'AVGPRICE',             # Average Price
+        'MEDPRICE',             # Median Price
+        'TYPPRICE',             # Typical Price
+        'WCLPRICE',             # Weighted Close Price
+    },
+    'Cycle Indicators': {
+        'HT_DCPERIOD',          # Hilbert Transform - Dominant Cycle Period
+        'HT_DCPHASE',           # Hilbert Transform - Dominant Cycle Phase
+        'HT_PHASOR-0',          # Hilbert Transform - Phasor Components
+        'HT_PHASOR-1',          # Hilbert Transform - Phasor Components
+        'HT_SINE-0',            # Hilbert Transform - SineWave
+        'HT_SINE-1',            # Hilbert Transform - SineWave
+        'HT_TRENDMODE',         # Hilbert Transform - Trend vs Cycle Mode
+    },
+    'Pattern Recognition': {
+        'CDL2CROWS',            # Two Crows
+        'CDL3BLACKCROWS',       # Three Black Crows
+        'CDL3INSIDE',           # Three Inside Up/Down
+        'CDL3LINESTRIKE',       # Three-Line Strike
+        'CDL3OUTSIDE',          # Three Outside Up/Down
+        'CDL3STARSINSOUTH',     # Three Stars In The South
+        'CDL3WHITESOLDIERS',    # Three Advancing White Soldiers
+        'CDLABANDONEDBABY',     # Abandoned Baby
+        'CDLADVANCEBLOCK',      # Advance Block
+        'CDLBELTHOLD',          # Belt-hold
+        'CDLBREAKAWAY',         # Breakaway
+        'CDLCLOSINGMARUBOZU',   # Closing Marubozu
+        'CDLCONCEALBABYSWALL',  # Concealing Baby Swallow
+        'CDLCOUNTERATTACK',     # Counterattack
+        'CDLDARKCLOUDCOVER',    # Dark Cloud Cover
+        'CDLDOJI',              # Doji
+        'CDLDOJISTAR',          # Doji Star
+        'CDLDRAGONFLYDOJI',     # Dragonfly Doji
+        'CDLENGULFING',         # Engulfing Pattern
+        'CDLEVENINGDOJISTAR',   # Evening Doji Star
+        'CDLEVENINGSTAR',       # Evening Star
+        'CDLGAPSIDESIDEWHITE',  # Up/Down-gap side-by-side white lines
+        'CDLGRAVESTONEDOJI',    # Gravestone Doji
+        'CDLHAMMER',            # Hammer
+        'CDLHANGINGMAN',        # Hanging Man
+        'CDLHARAMI',            # Harami Pattern
+        'CDLHARAMICROSS',       # Harami Cross Pattern
+        'CDLHIGHWAVE',          # High-Wave Candle
+        'CDLHIKKAKE',           # Hikkake Pattern
+        'CDLHIKKAKEMOD',        # Modified Hikkake Pattern
+        'CDLHOMINGPIGEON',      # Homing Pigeon
+        'CDLIDENTICAL3CROWS',   # Identical Three Crows
+        'CDLINNECK',            # In-Neck Pattern
+        'CDLINVERTEDHAMMER',    # Inverted Hammer
+        'CDLKICKING',           # Kicking
+        'CDLKICKINGBYLENGTH',   # Kicking - bull/bear determined by the longer marubozu
+        'CDLLADDERBOTTOM',      # Ladder Bottom
+        'CDLLONGLEGGEDDOJI',    # Long Legged Doji
+        'CDLLONGLINE',          # Long Line Candle
+        'CDLMARUBOZU',          # Marubozu
+        'CDLMATCHINGLOW',       # Matching Low
+        'CDLMATHOLD',           # Mat Hold
+        'CDLMORNINGDOJISTAR',   # Morning Doji Star
+        'CDLMORNINGSTAR',       # Morning Star
+        'CDLONNECK',            # On-Neck Pattern
+        'CDLPIERCING',          # Piercing Pattern
+        'CDLRICKSHAWMAN',       # Rickshaw Man
+        'CDLRISEFALL3METHODS',  # Rising/Falling Three Methods
+        'CDLSEPARATINGLINES',   # Separating Lines
+        'CDLSHOOTINGSTAR',      # Shooting Star
+        'CDLSHORTLINE',         # Short Line Candle
+        'CDLSPINNINGTOP',       # Spinning Top
+        'CDLSTALLEDPATTERN',    # Stalled Pattern
+        'CDLSTICKSANDWICH',     # Stick Sandwich
+        'CDLTAKURI',            # Takuri (Dragonfly Doji with very long lower shadow)
+        'CDLTASUKIGAP',         # Tasuki Gap
+        'CDLTHRUSTING',         # Thrusting Pattern
+        'CDLTRISTAR',           # Tristar Pattern
+        'CDLUNIQUE3RIVER',      # Unique 3 River
+        'CDLUPSIDEGAP2CROWS',   # Upside Gap Two Crows
+        'CDLXSIDEGAP3METHODS',  # Upside/Downside Gap Three Methods
+
+    },
+    'Statistic Functions': {
+        'BETA',                 # Beta
+        'CORREL',               # Pearson's Correlation Coefficient (r)
+        'LINEARREG',            # Linear Regression
+        'LINEARREG_ANGLE',      # Linear Regression Angle
+        'LINEARREG_INTERCEPT',  # Linear Regression Intercept
+        'LINEARREG_SLOPE',      # Linear Regression Slope
+        'STDDEV',               # Standard Deviation
+        'TSF',                  # Time Series Forecast
+        'VAR',                  # Variance
+    }
+
+}
+god_genes = set()
 ########################### SETTINGS ##############################
-# shuffle(god_genes)
-# god_genes = god_genes[:5]
-# god_genes = ['SMA', 'EMA', 'RSI', 'MFI']
-timeperiods = [5, 10, 100, 6, 15, 145]
+
+god_genes = {'SMA'}
+# god_genes |= all_god_genes['Overlap Studies']
+# god_genes |= all_god_genes['Momentum Indicators']
+# god_genes |= all_god_genes['Volume Indicators']
+# god_genes |= all_god_genes['Volatility Indicators']
+# god_genes |= all_god_genes['Price Transform']
+# god_genes |= all_god_genes['Cycle Indicators']
+# god_genes |= all_god_genes['Pattern Recognition']
+# god_genes |= all_god_genes['Statistic Functions']
+
+timeperiods = [5, 6, 12, 15, 50, 55, 100, 110]
 operators = [
     "D",  # Disabled gene
     ">",  # Indicator, bigger than cross indicator
@@ -81,23 +218,28 @@ operators = [
     "/<R",  # Normalized indicator devided to cross indicator, smaller than real number
     "UT",  # Indicator, is in UpTrend status
     "DT",  # Indicator, is in DownTrend status
-    "OT",  # Indicator, is in Off trend status(horizontal slope)
+    "OT",  # Indicator, is in Off trend status(RANGE)
     "CUT",  # Indicator, Entered to UpTrend status
     "CDT",  # Indicator, Entered to DownTrend status
-    "COT"  # Indicator, Entered to Off trend status(horizontal slope)
+    "COT"  # Indicator, Entered to Off trend status(RANGE)
 ]
 # number of candles to check up,don,off trend.
 TREND_CHECK_CANDLES = 4
-
+DECIMALS = 1
 ########################### END SETTINGS ##########################
+# DATAFRAME = DataFrame()
 
-print('selected indicators for optimzatin: \n', god_genes)
+god_genes = list(god_genes)
+# print('selected indicators for optimzatin: \n', god_genes)
 
 god_genes_with_timeperiod = list()
-for gene in god_genes:
+for god_gene in god_genes:
     for timeperiod in timeperiods:
-        god_genes_with_timeperiod.append(f'{gene}-{timeperiod}')
+        god_genes_with_timeperiod.append(f'{god_gene}-{timeperiod}')
 
+# Let give somethings to CatagoricalParam to Play with them
+# When just one thing is inside catagorical lists
+# TODO: its Not True Way :)
 if len(god_genes) == 1:
     god_genes = god_genes*2
 if len(timeperiods) == 1:
@@ -107,133 +249,176 @@ if len(operators) == 1:
 
 
 def normalize(df):
-    return (df-df.min())/(df.max()-df.min())
+    df = (df-df.min())/(df.max()-df.min())
+    return df
 
 
 def gene_calculator(dataframe, indicator):
-    if indicator in dataframe.index:
+    # Cuz Timeperiods not effect calculating CDL patterns recognations
+    if 'CDL' in indicator:
+        splited_indicator = indicator.split('-')
+        splited_indicator[1] = "0"
+        new_indicator = "-".join(splited_indicator)
+        # print(indicator, new_indicator)
+        indicator = new_indicator
+
+    gene = indicator.split("-")
+
+    gene_name = gene[0]
+    gene_len = len(gene)
+
+    if indicator in dataframe.keys():
+        # print(f"{indicator}, calculated befoure")
+        # print(len(dataframe.keys()))
         return dataframe[indicator]
     else:
-        gene = indicator.split("-")
-        gene_name = gene[0]
         result = None
-        if len(gene) == 2:
+        # For Pattern Recognations
+        if gene_len == 1:
+            # print('gene_len == 1\t', indicator)
+            result = getattr(ta, gene_name)(
+                dataframe
+            )
+            return normalize(result)
+        elif gene_len == 2:
+            # print('gene_len == 2\t', indicator)
             gene_timeperiod = int(gene[1])
             result = getattr(ta, gene_name)(
                 dataframe,
                 timeperiod=gene_timeperiod,
             )
-
-        elif len(gene) == 3:
-            gene_index = int(gene[1])
+            return normalize(result)
+        # For
+        elif gene_len == 3:
+            # print('gene_len == 3\t', indicator)
             gene_timeperiod = int(gene[2])
+            gene_index = int(gene[1])
             result = getattr(ta, gene_name)(
                 dataframe,
                 timeperiod=gene_timeperiod,
             ).iloc[:, gene_index]
-        return normalize(result).fillna(0)
+            return normalize(result)
+        # For trend operators(MA-5-SMA-4)
+        elif gene_len == 4:
+            # print('gene_len == 4\t', indicator)
+            gene_timeperiod = int(gene[1])
+            sharp_indicator = f'{gene_name}-{gene_timeperiod}'
+            dataframe[sharp_indicator] = getattr(ta, gene_name)(
+                dataframe,
+                timeperiod=gene_timeperiod,
+            )
+            return normalize(ta.SMA(dataframe[sharp_indicator].fillna(0), TREND_CHECK_CANDLES))
+        # For trend operators(STOCH-0-4-SMA-4)
+        elif gene_len == 5:
+            # print('gene_len == 5\t', indicator)
+            gene_timeperiod = int(gene[2])
+            gene_index = int(gene[1])
+            sharp_indicator = f'{gene_name}-{gene_index}-{gene_timeperiod}'
+            dataframe[sharp_indicator] = getattr(ta, gene_name)(
+                dataframe,
+                timeperiod=gene_timeperiod,
+            ).iloc[:, gene_index]
+            return normalize(ta.SMA(dataframe[sharp_indicator].fillna(0), TREND_CHECK_CANDLES))
 
 
 def condition_generator(dataframe, operator, indicator, crossed_indicator, real_num):
+
     condition = (dataframe['volume'] > 10)
 
     # TODO : it ill callculated in populate indicators.
-    indicator_dataframe = gene_calculator(dataframe, indicator)
-    crossed_indicator_dataframe = gene_calculator(
-        dataframe, crossed_indicator)
+
+    dataframe[indicator] = gene_calculator(dataframe, indicator)
+    dataframe[crossed_indicator] = gene_calculator(dataframe, crossed_indicator)
+
+    indicator_trend_sma = f"{indicator}-SMA-{TREND_CHECK_CANDLES}"
+    if operator in ["UT", "DT", "OT", "CUT", "CDT", "COT"]:
+        dataframe[indicator_trend_sma] = gene_calculator(dataframe, indicator_trend_sma)
 
     if operator == ">":
         condition = (
-            indicator_dataframe > crossed_indicator_dataframe
+            dataframe[indicator] > dataframe[crossed_indicator]
         )
     elif operator == "=":
         condition = (
-            np.isclose(indicator_dataframe, crossed_indicator_dataframe)
+            np.isclose(dataframe[indicator], dataframe[crossed_indicator])
         )
     elif operator == "<":
         condition = (
-            indicator_dataframe < crossed_indicator_dataframe
+            dataframe[indicator] < dataframe[crossed_indicator]
         )
     elif operator == "C":
         condition = (
-            (qtpylib.crossed_below(indicator_dataframe, crossed_indicator_dataframe)) |
-            (qtpylib.crossed_above(indicator_dataframe, crossed_indicator_dataframe))
+            (qtpylib.crossed_below(dataframe[indicator], dataframe[crossed_indicator])) |
+            (qtpylib.crossed_above(dataframe[indicator], dataframe[crossed_indicator]))
         )
     elif operator == "CA":
         condition = (
-            qtpylib.crossed_above(indicator_dataframe,
-                                  crossed_indicator_dataframe)
+            qtpylib.crossed_above(dataframe[indicator], dataframe[crossed_indicator])
         )
     elif operator == "CB":
         condition = (
             qtpylib.crossed_below(
-                indicator_dataframe, crossed_indicator_dataframe)
+                dataframe[indicator], dataframe[crossed_indicator])
         )
     elif operator == ">R":
         condition = (
-            indicator_dataframe > real_num
+            dataframe[indicator] > real_num
         )
     elif operator == "=R":
         condition = (
-            np.isclose(indicator_dataframe, real_num)
+            np.isclose(dataframe[indicator], real_num)
         )
     elif operator == "<R":
         condition = (
-            indicator_dataframe < real_num
+            dataframe[indicator] < real_num
         )
     elif operator == "/>R":
         condition = (
-            indicator_dataframe.div(crossed_indicator_dataframe) > real_num
+            dataframe[indicator].div(dataframe[crossed_indicator]) > real_num
         )
     elif operator == "/=R":
         condition = (
-            np.isclose(indicator_dataframe.div(
-                crossed_indicator_dataframe), real_num)
+            np.isclose(dataframe[indicator].div(dataframe[crossed_indicator]), real_num)
         )
     elif operator == "/<R":
         condition = (
-            indicator_dataframe.div(crossed_indicator_dataframe) < real_num
+            dataframe[indicator].div(dataframe[crossed_indicator]) < real_num
         )
     elif operator == "UT":
         condition = (
-            indicator_dataframe > ta.SMA(
-                indicator_dataframe, TREND_CHECK_CANDLES)
+            dataframe[indicator] > dataframe[indicator_trend_sma]
         )
     elif operator == "DT":
         condition = (
-            indicator_dataframe < ta.SMA(
-                indicator_dataframe, TREND_CHECK_CANDLES)
+            dataframe[indicator] < dataframe[indicator_trend_sma]
         )
     elif operator == "OT":
         condition = (
 
-            np.isclose(indicator_dataframe, ta.SMA(
-                indicator_dataframe, TREND_CHECK_CANDLES))
+            np.isclose(dataframe[indicator], dataframe[indicator_trend_sma])
         )
     elif operator == "CUT":
         condition = (
             (
                 qtpylib.crossed_above(
-                    indicator_dataframe,
-                    ta.SMA(indicator_dataframe, TREND_CHECK_CANDLES)
+                    dataframe[indicator],
+                    dataframe[indicator_trend_sma]
                 )
             ) &
             (
-                indicator_dataframe > ta.SMA(
-                    indicator_dataframe, TREND_CHECK_CANDLES)
+                dataframe[indicator] > dataframe[indicator_trend_sma]
             )
         )
     elif operator == "CDT":
         condition = (
             (
                 qtpylib.crossed_below(
-                    indicator_dataframe,
-                    ta.SMA(indicator_dataframe, TREND_CHECK_CANDLES)
+                    dataframe[indicator],
+                    dataframe[indicator_trend_sma]
                 )
             ) &
             (
-                indicator_dataframe < ta.SMA(
-                    indicator_dataframe, TREND_CHECK_CANDLES)
+                dataframe[indicator] < dataframe[indicator_trend_sma]
             )
         )
     elif operator == "COT":
@@ -241,67 +426,31 @@ def condition_generator(dataframe, operator, indicator, crossed_indicator, real_
             (
                 (
                     qtpylib.crossed_below(
-                        indicator_dataframe,
-                        ta.SMA(indicator_dataframe, TREND_CHECK_CANDLES)
+                        dataframe[indicator],
+                        dataframe[indicator_trend_sma]
                     )
                 ) |
                 (
                     qtpylib.crossed_above(
-                        indicator_dataframe,
-                        ta.SMA(indicator_dataframe, TREND_CHECK_CANDLES)
+                        dataframe[indicator],
+                        dataframe[indicator_trend_sma]
                     )
                 )
             ) &
             (
-                np.isclose(indicator_dataframe, ta.SMA(
-                    indicator_dataframe, TREND_CHECK_CANDLES))
+                np.isclose(
+                    dataframe[indicator],
+                    dataframe[indicator_trend_sma]
+                )
             )
         )
 
-    return condition
+    return condition, dataframe
 
 
-class GodStra(IStrategy):
+class GodStraNew(IStrategy):
     # #################### RESULTS PASTE PLACE ####################
-    # *   12/1000:      6 trades.
-    # 6/0/0 Wins/Draws/Losses.
-    # Avg profit  114.67%.
-    # Median profit  127.86%.
-    # Total profit  0.13885893 BTC ( 138.86Σ%).
-    # Avg duration 30 days, 10:00:00 min.
-    # Objective: -6.09827
 
-    # Buy hyperspace params:
-    buy_params = {
-        "buy_crossed_indicator0": "MAMA-0-6",
-        "buy_crossed_indicator1": "SQRT-100",
-        "buy_crossed_indicator2": "HT_PHASOR-0-100",
-        "buy_indicator0": "CDLSHORTLINE-100",
-        "buy_indicator1": "CORREL-100",
-        "buy_indicator2": "CDLLONGLINE-100",
-        "buy_operator0": "C",
-        "buy_operator1": "=",
-        "buy_operator2": "<R",
-        "buy_real_num0": 0.00599,
-        "buy_real_num1": 0.97236,
-        "buy_real_num2": 0.9266,
-    }
-
-    # Sell hyperspace params:
-    sell_params = {
-        "sell_crossed_indicator0": "CDLTASUKIGAP-5",
-        "sell_crossed_indicator1": "SAR-5",
-        "sell_crossed_indicator2": "TRIX-5",
-        "sell_indicator0": "LINEARREG-5",
-        "sell_indicator1": "MIDPOINT-145",
-        "sell_indicator2": "MEDPRICE-145",
-        "sell_operator0": "CDT",
-        "sell_operator1": ">",
-        "sell_operator2": "UT",
-        "sell_real_num0": 0.2614,
-        "sell_real_num1": 0.13667,
-        "sell_real_num2": 0.37739,
-    }
     # #################### END OF RESULT PLACE ####################
 
     # TODO: Its not dry code!
@@ -324,9 +473,9 @@ class GodStra(IStrategy):
     buy_operator1 = CategoricalParameter(operators, default="<R", space='buy')
     buy_operator2 = CategoricalParameter(operators, default="CB", space='buy')
 
-    buy_real_num0 = RealParameter(0, 1, default=0.89009, space='buy')
-    buy_real_num1 = RealParameter(0, 1, default=0.56953, space='buy')
-    buy_real_num2 = RealParameter(0, 1, default=0.38365, space='buy')
+    buy_real_num0 = DecimalParameter(0, 1, decimals=DECIMALS,  default=0.89009, space='buy')
+    buy_real_num1 = DecimalParameter(0, 1, decimals=DECIMALS, default=0.56953, space='buy')
+    buy_real_num2 = DecimalParameter(0, 1, decimals=DECIMALS, default=0.38365, space='buy')
 
     # Sell Hyperoptable Parameters/Spaces.
     sell_crossed_indicator0 = CategoricalParameter(
@@ -343,15 +492,13 @@ class GodStra(IStrategy):
     sell_indicator2 = CategoricalParameter(
         god_genes_with_timeperiod, default="CDL2CROWS-5", space='sell')
 
-    sell_operator0 = CategoricalParameter(
-        operators, default="<R", space='sell')
+    sell_operator0 = CategoricalParameter(operators, default="<R", space='sell')
     sell_operator1 = CategoricalParameter(operators, default="D", space='sell')
-    sell_operator2 = CategoricalParameter(
-        operators, default="/>R", space='sell')
+    sell_operator2 = CategoricalParameter(operators, default="/>R", space='sell')
 
-    sell_real_num0 = RealParameter(0, 1, default=0.09731, space='sell')
-    sell_real_num1 = RealParameter(0, 1, default=0.81657, space='sell')
-    sell_real_num2 = RealParameter(0, 1, default=0.87267, space='sell')
+    sell_real_num0 = DecimalParameter(0, 1, decimals=DECIMALS, default=0.09731, space='sell')
+    sell_real_num1 = DecimalParameter(0, 1, decimals=DECIMALS, default=0.81657, space='sell')
+    sell_real_num2 = DecimalParameter(0, 1, decimals=DECIMALS, default=0.87267, space='sell')
 
     # Stoploss:
     stoploss = -1
@@ -369,33 +516,56 @@ class GodStra(IStrategy):
         return dataframe
 
     def populate_buy_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+
         conditions = list()
+
         # TODO: Its not dry code!
         buy_indicator = self.buy_indicator0.value
         buy_crossed_indicator = self.buy_crossed_indicator0.value
         buy_operator = self.buy_operator0.value
         buy_real_num = self.buy_real_num0.value
-        conditions.append(condition_generator(dataframe,
-                                              buy_operator, buy_indicator, buy_crossed_indicator, buy_real_num))
-
+        condition, dataframe = condition_generator(
+            dataframe,
+            buy_operator,
+            buy_indicator,
+            buy_crossed_indicator,
+            buy_real_num
+        )
+        conditions.append(condition)
+        # backup
         buy_indicator = self.buy_indicator1.value
         buy_crossed_indicator = self.buy_crossed_indicator1.value
         buy_operator = self.buy_operator1.value
         buy_real_num = self.buy_real_num1.value
-        conditions.append(condition_generator(dataframe,
-                                              buy_operator, buy_indicator, buy_crossed_indicator, buy_real_num))
+
+        condition, dataframe = condition_generator(
+            dataframe,
+            buy_operator,
+            buy_indicator,
+            buy_crossed_indicator,
+            buy_real_num
+        )
+        conditions.append(condition)
 
         buy_indicator = self.buy_indicator2.value
         buy_crossed_indicator = self.buy_crossed_indicator2.value
         buy_operator = self.buy_operator2.value
         buy_real_num = self.buy_real_num2.value
-        conditions.append(condition_generator(dataframe,
-                                              buy_operator, buy_indicator, buy_crossed_indicator, buy_real_num))
+        condition, dataframe = condition_generator(
+            dataframe,
+            buy_operator,
+            buy_indicator,
+            buy_crossed_indicator,
+            buy_real_num
+        )
+        conditions.append(condition)
 
         if conditions:
             dataframe.loc[
                 reduce(lambda x, y: x & y, conditions),
                 'buy']=1
+
+        # print(len(dataframe.keys()))
 
         return dataframe
 
@@ -407,22 +577,40 @@ class GodStra(IStrategy):
         sell_crossed_indicator = self.sell_crossed_indicator0.value
         sell_operator = self.sell_operator0.value
         sell_real_num = self.sell_real_num0.value
-        conditions.append(condition_generator(dataframe,
-                                              sell_operator, sell_indicator, sell_crossed_indicator, sell_real_num))
+        condition, dataframe = condition_generator(
+            dataframe,
+            sell_operator,
+            sell_indicator,
+            sell_crossed_indicator,
+            sell_real_num
+        )
+        conditions.append(condition)
 
         sell_indicator = self.sell_indicator1.value
         sell_crossed_indicator = self.sell_crossed_indicator1.value
         sell_operator = self.sell_operator1.value
         sell_real_num = self.sell_real_num1.value
-        conditions.append(condition_generator(dataframe,
-                                              sell_operator, sell_indicator, sell_crossed_indicator, sell_real_num))
+        condition, dataframe = condition_generator(
+            dataframe,
+            sell_operator,
+            sell_indicator,
+            sell_crossed_indicator,
+            sell_real_num
+        )
+        conditions.append(condition)
 
         sell_indicator = self.sell_indicator2.value
         sell_crossed_indicator = self.sell_crossed_indicator2.value
         sell_operator = self.sell_operator2.value
         sell_real_num = self.sell_real_num2.value
-        conditions.append(condition_generator(dataframe,
-                                              sell_operator, sell_indicator, sell_crossed_indicator, sell_real_num))
+        condition, dataframe = condition_generator(
+            dataframe,
+            sell_operator,
+            sell_indicator,
+            sell_crossed_indicator,
+            sell_real_num
+        )
+        conditions.append(condition)
 
         if conditions:
             dataframe.loc[
